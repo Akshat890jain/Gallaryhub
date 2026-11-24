@@ -1,0 +1,115 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reusable zero-trust helper primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidMediaOverride(data, userId, mediaId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.mediaId is string &&
+             data.mediaId == mediaId &&
+             data.mediaId.size() >= 1 && data.mediaId.size() <= 128 &&
+             data.favorite is bool &&
+             data.customTags is list &&
+             data.customTags.size() <= 30 &&
+             (data.customTags.size() == 0 || (data.customTags[0] is string && data.customTags[0].size() <= 60)) &&
+             data.hiddenInVault is bool &&
+             (!('renamedTitle' in data) || data.renamedTitle == null || (data.renamedTitle is string && data.renamedTitle.size() >= 1 && data.renamedTitle.size() <= 200)) &&
+             (!('ocrText' in data) || data.ocrText == null || (data.ocrText is string && data.ocrText.size() <= 12000)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidStudioState(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             (!('vaultPinHash' in data) || data.vaultPinHash == null || (data.vaultPinHash is string && data.vaultPinHash.size() >= 16 && data.vaultPinHash.size() <= 128)) &&
+             data.vaultBiometricEnabled is bool &&
+             data.clearedActivityIds is list &&
+             data.clearedActivityIds.size() <= 200 &&
+             (data.clearedActivityIds.size() == 0 || (data.clearedActivityIds[0] is string && data.clearedActivityIds[0].size() <= 128)) &&
+             data.themeMode is string && data.themeMode.size() >= 4 && data.themeMode.size() <= 10 &&
+             data.themeMode in ['system', 'light', 'dark'] &&
+             data.accentHex is string && data.accentHex.size() >= 4 && data.accentHex.size() <= 12 &&
+             data.exifScrubDefaultOn is bool &&
+             data.wifiOnlyUploads is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // Per-user companion media metadata overrides
+    match /users/{userId}/mediaOverrides/{mediaId} {
+      allow get: if isOwner(userId) && isValidId(userId) && isValidId(mediaId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidId(mediaId) &&
+                       incoming().keys().hasAll(['userId', 'mediaId', 'favorite', 'customTags', 'hiddenInVault', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'mediaId', 'favorite', 'customTags', 'renamedTitle', 'hiddenInVault', 'ocrText', 'createdAt', 'updatedAt']) &&
+                       isValidMediaOverride(incoming(), userId, mediaId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidId(mediaId) &&
+                       isValidMediaOverride(incoming(), userId, mediaId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().mediaId == existing().mediaId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['favorite', 'customTags', 'renamedTitle', 'hiddenInVault', 'ocrText', 'updatedAt']);
+
+      allow delete: if isOwner(userId) && isValidId(userId) && isValidId(mediaId);
+    }
+
+    // Per-user studio preferences, Private Vault PIN hash, and cleared activity IDs
+    match /users/{userId}/studioState/{docId} {
+      allow get: if isOwner(userId) && isValidId(userId) && isValidId(docId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidId(docId) &&
+                       incoming().keys().hasAll(['userId', 'vaultBiometricEnabled', 'clearedActivityIds', 'themeMode', 'accentHex', 'exifScrubDefaultOn', 'wifiOnlyUploads', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'vaultPinHash', 'vaultBiometricEnabled', 'clearedActivityIds', 'themeMode', 'accentHex', 'exifScrubDefaultOn', 'wifiOnlyUploads', 'createdAt', 'updatedAt']) &&
+                       isValidStudioState(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidId(docId) &&
+                       isValidStudioState(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['vaultPinHash', 'vaultBiometricEnabled', 'clearedActivityIds', 'themeMode', 'accentHex', 'exifScrubDefaultOn', 'wifiOnlyUploads', 'updatedAt']);
+
+      allow delete: if isOwner(userId) && isValidId(userId) && isValidId(docId);
+    }
+  }
+}

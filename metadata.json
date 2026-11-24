@@ -1,0 +1,6 @@
+{
+  "name": "GalleryHub",
+  "description": "Full-stack cloud media management studio with unified gallery, image editor, collaborative folders, and cryptographic link sharing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

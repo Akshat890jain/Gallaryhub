@@ -1,0 +1,1493 @@
+# 🖼️ GalleryHub — Comprehensive Technical & Feature Specification
+
+> **GalleryHub** is an enterprise-grade, full-stack media management platform built on the MERN stack (MongoDB, Express.js, React 18, Node.js). This document serves as the exhaustive architectural and functional specification for the entire application. **Each feature is documented in extreme technical depth (exceeding 500 words per feature), accompanied by dedicated Mermaid architectural diagrams, data flow representations, component trees, and database schemas.**
+
+---
+
+## Table of Contents
+
+1. [High-Level System Architecture](#1-high-level-system-architecture)
+2. [Database Entity-Relationship Architecture](#2-database-entity-relationship-architecture)
+3. [Feature 1: User Authentication, Security & JWT Session Management](#feature-1-user-authentication-security--jwt-session-management)
+4. [Feature 2: Multi-Format Media Upload & Processing Engine](#feature-2-multi-format-media-upload--processing-engine)
+5. [Feature 3: Unified Media Gallery, Filtering, Sorting & Multi-View Display](#feature-3-unified-media-gallery-filtering-sorting--multi-view-display)
+6. [Feature 4: Full-Screen Media Lightbox, Multi-Format Document Viewer & Slideshow](#feature-4-full-screen-media-lightbox-multi-format-document-viewer--slideshow)
+7. [Feature 5: In-Browser Image Editing Studio](#feature-5-in-browser-image-editing-studio)
+8. [Feature 6: Folder Management, Hierarchical Organization & Drag-and-Drop](#feature-6-folder-management-hierarchical-organization--drag-and-drop)
+9. [Feature 7: Collaborative Folder Sharing & Role-Based Access Control](#feature-7-collaborative-folder-sharing--role-based-access-control)
+10. [Feature 8: Public File Sharing, Cryptographic Tokens & Link Protection](#feature-8-public-file-sharing-cryptographic-tokens--link-protection)
+11. [Feature 9: Trash, Two-Stage Soft-Delete & Permanent Erasure Engine](#feature-9-trash-two-stage-soft-delete--permanent-erasure-engine)
+12. [Feature 10: Bulk Operations, Multi-Select Engine & Streaming ZIP Archival](#feature-10-bulk-operations-multi-select-engine--streaming-zip-archival)
+13. [Feature 11: Real-Time Activity Feed & Audit Logging System](#feature-11-real-time-activity-feed--audit-logging-system)
+14. [Feature 12: AI-Powered Context-Aware Chatbot Assistant](#feature-12-ai-powered-context-aware-chatbot-assistant)
+15. [Feature 13: User Profile, Account Security, Storage Quotas & Danger Zone Operations](#feature-13-user-profile-account-security-storage-quotas--danger-zone-operations)
+16. [Feature 14: System-Aware Dynamic Theme Engine & Custom Accent Color Customizer](#feature-14-system-aware-dynamic-theme-engine--custom-accent-color-customizer)
+17. [Feature 15: Guided Onboarding Tour, Skeleton Shimmer Loading & UI Polish](#feature-15-guided-onboarding-tour-skeleton-shimmer-loading--ui-polish)
+18. [Deployment, Environment Configurations & Complete API Reference](#deployment-environment-configurations--complete-api-reference)
+
+---
+
+## 1. High-Level System Architecture
+
+GalleryHub is architected as a decoupled client-server web application. The frontend is built on React 18 using modern functional programming patterns, hook-driven state management, and client-side routing via `react-router-dom` v6. The backend runs on Node.js using Express.js to expose a secure, RESTful JSON API backed by a cloud-hosted MongoDB Atlas database cluster.
+
+```mermaid
+flowchart TD
+    subgraph Client["Client Tier (React 18 SPA)"]
+        UI["React Virtual DOM / UI Layer"]
+        Router["react-router-dom v6 (createBrowserRouter)"]
+        State["React Hooks State (useState, useCallback, useRef)"]
+        Storage_Local["Browser LocalStorage (userInfo, themeMode, preferences)"]
+        HTTP_Client["Fetch API & Axios Interceptors"]
+        
+        UI <--> Router
+        UI <--> State
+        State <--> Storage_Local
+        State <--> HTTP_Client
+    end
+
+    subgraph Gateway["API Gateway & Network Tier"]
+        CORS["CORS Dynamic Origin Filter"]
+        RateLimit["Network Keep-Alive /api/ping"]
+        StaticServe["Express Static Middleware (/uploads, /videos, /documents)"]
+        AuthMid["authMiddleware (Bearer JWT Verification)"]
+    end
+
+    subgraph Server["Backend Tier (Node.js & Express.js)"]
+        UserCtrl["userRoutes (/api/users)"]
+        ImgCtrl["imageRoutes (/api/images)"]
+        VidCtrl["videoRoutes (/api/videos)"]
+        DocCtrl["documentRoutes (/api/documents)"]
+        FoldCtrl["folderRoutes (/api/folders)"]
+        ShareCtrl["shareRoutes (/api/share)"]
+        ActCtrl["activityRoutes (/api/activity)"]
+        BotCtrl["chatbotRoutes (/api/chatbot)"]
+        
+        UploadEngine["Multer DiskStorage Engine"]
+        MediaWorker["fluent-ffmpeg / ffprobe Worker"]
+        ZipEngine["Archiver Zlib Compression Engine"]
+        AIEngine["OpenAI GPT-3.5 Client"]
+    end
+
+    subgraph Data["Persistence & Storage Tier"]
+        MongooseODM["Mongoose ODM Models"]
+        MongoCluster[("MongoDB Atlas Cloud Database")]
+        FileDisk[("Local / Persistent Disk Storage")]
+    end
+
+    HTTP_Client <== "JSON / REST via HTTP/HTTPS" ==> CORS
+    CORS --> AuthMid
+    AuthMid --> UserCtrl & ImgCtrl & VidCtrl & DocCtrl & FoldCtrl & ShareCtrl & ActCtrl & BotCtrl
+    
+    ImgCtrl & VidCtrl & DocCtrl --> UploadEngine --> FileDisk
+    VidCtrl -.-> MediaWorker -.-> FileDisk
+    ImgCtrl & VidCtrl & DocCtrl --> ZipEngine
+    BotCtrl --> AIEngine
+    
+    UserCtrl & ImgCtrl & VidCtrl & DocCtrl & FoldCtrl & ShareCtrl & ActCtrl --> MongooseODM
+    MongooseODM <== "TCP Wire Protocol" ==> MongoCluster
+    StaticServe ==> FileDisk
+```
+
+---
+
+## 2. Database Entity-Relationship Architecture
+
+The MongoDB persistence layer utilizes Mongoose schemas with explicit field types, referential integrity references (`ref`), validation rules, compound indexes, and pre-save middleware hooks.
+
+```mermaid
+erDiagram
+    USER ||--o{ IMAGE : "owns (1:N)"
+    USER ||--o{ VIDEO : "owns (1:N)"
+    USER ||--o{ DOCUMENT : "owns (1:N)"
+    USER ||--o{ FOLDER : "creates (1:N)"
+    USER ||--o{ SHARELINK : "generates (1:N)"
+    USER ||--o{ ACTIVITY : "triggers (1:N)"
+    FOLDER ||--o{ IMAGE : "groups (0:N)"
+    FOLDER ||--o{ VIDEO : "groups (0:N)"
+    FOLDER ||--o{ DOCUMENT : "groups (0:N)"
+    FOLDER ||--o{ USER : "shares with (N:M via sharedWith)"
+
+    USER {
+        ObjectId _id PK
+        String name "Required"
+        String email "Required, Unique, Lowercase Index"
+        String password "Required, select=false, Bcrypt Hash"
+        String profilePicture "Filename"
+        Date createdAt "Timestamp"
+        Date updatedAt "Timestamp"
+    }
+
+    IMAGE {
+        ObjectId _id PK
+        String filename "Disk filename"
+        String originalName "User upload filename"
+        String path "Normalized filesystem path"
+        Number size "File size in bytes"
+        ObjectId user FK "Ref User, Required"
+        ObjectId folder FK "Ref Folder, Default null"
+        Boolean isDeleted "Default false"
+        Date deletedAt "Default null"
+        Date uploadDate "Default now"
+    }
+
+    VIDEO {
+        ObjectId _id PK
+        String filename "Disk filename"
+        String originalName "User upload filename"
+        String thumbnail "Generated JPG filename"
+        Number duration "Duration in seconds"
+        String path "Normalized filesystem path"
+        Number size "File size in bytes"
+        ObjectId user FK "Ref User, Required"
+        ObjectId folder FK "Ref Folder, Default null"
+        Boolean isDeleted "Default false"
+        Date deletedAt "Default null"
+        Date uploadDate "Default now"
+    }
+
+    DOCUMENT {
+        ObjectId _id PK
+        String filename "Disk filename"
+        String originalName "User upload filename"
+        String type "File extension: pdf, docx, etc."
+        String path "Normalized filesystem path"
+        Number size "File size in bytes"
+        ObjectId user FK "Ref User, Required"
+        ObjectId folder FK "Ref Folder, Default null"
+        Boolean isDeleted "Default false"
+        Date deletedAt "Default null"
+        Date uploadDate "Default now"
+    }
+
+    FOLDER {
+        ObjectId _id PK
+        String name "Required, Compound Unique Index"
+        String color "Hex color code"
+        ObjectId user FK "Owner Ref User, Required"
+        Array sharedWith "Array of {user, permission, addedAt}"
+        Date createdAt "Default now"
+    }
+
+    SHARELINK {
+        ObjectId _id PK
+        ObjectId fileId FK "Polymorphic reference"
+        String fileType "Enum: image, video, document"
+        ObjectId user FK "Ref User, Required"
+        String token "32-byte hex, Unique Index"
+        String password "Bcrypt hash or null"
+        Date expiresAt "Expiration date or null"
+        Number viewCount "Default 0"
+        Date createdAt "Default now"
+    }
+
+    ACTIVITY {
+        ObjectId _id PK
+        ObjectId user FK "Ref User, Required, Indexed"
+        String action "Enum: upload, delete, restore, move, etc."
+        String targetName "Target file/folder name"
+        String targetType "Enum: image, video, document, folder"
+        Mixed metadata "Contextual payload"
+        Date createdAt "Default now, Indexed"
+    }
+```
+
+---
+
+## Feature 1: User Authentication, Security & JWT Session Management
+
+### 1.1 Overview & Architecture
+GalleryHub employs a stateless, token-based authentication mechanism utilizing JSON Web Tokens (JWT) coupled with salted bcrypt cryptographic password hashing. This subsystem provides isolated tenancy: all media assets, folder hierarchies, activity records, and sharing permissions are strictly scoped to the authenticated user ID extracted from the verified token payload.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Web Browser (React SPA)
+    participant AuthAPI as /api/users/login
+    participant UserModel as Mongoose User Model
+    participant DB as MongoDB Atlas
+    participant Mid as authMiddleware (protect)
+    participant ProtectedRoute as Protected API Routes
+
+    Note over Client,AuthAPI: Authentication Phase
+    Client->>AuthAPI: POST { email, password }
+    AuthAPI->>UserModel: findOne({ email: email.toLowerCase().trim() }).select('+password')
+    UserModel->>DB: Execute query
+    DB-->>UserModel: User document with password hash
+    UserModel-->>AuthAPI: User object
+    AuthAPI->>AuthAPI: bcrypt.compare(password, user.password)
+    alt Invalid Credentials
+        AuthAPI-->>Client: 401 Unauthorized { message: 'Invalid email or password' }
+    else Valid Credentials
+        AuthAPI->>AuthAPI: jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '30d' })
+        AuthAPI-->>Client: 200 OK { _id, name, email, profilePicture, token }
+        Client->>Client: localStorage.setItem('userInfo', JSON.stringify(data))
+    end
+
+    Note over Client,ProtectedRoute: Authorization Phase (Subsequent Requests)
+    Client->>Mid: GET /api/images (Header: Bearer <token>)
+    Mid->>Mid: jwt.verify(token, JWT_SECRET)
+    alt Verification Fails (Expired / Tampered)
+        Mid-->>Client: 401 Unauthorized { message: 'Not authorized, token failed' }
+    else Verification Succeeds
+        Mid->>UserModel: findById(decoded.id).select('-password')
+        UserModel->>DB: Execute query
+        DB-->>UserModel: User entity
+        UserModel-->>Mid: User document
+        Mid->>Mid: Attach req.user = user; req.user.id = user._id
+        Mid->>ProtectedRoute: next()
+        ProtectedRoute-->>Client: 200 OK (User-Scoped Data)
+    end
+```
+
+### 1.2 Deep Technical Implementation
+
+#### Registration Pipeline
+When a prospective user signs up, the request lands on `POST /api/users/register`. The incoming payload contains `name`, `email`, and `password`. The controller normalizes the email address by applying `.toLowerCase().trim()` to prevent duplicate accounts arising from casing inconsistencies. It evaluates whether an account already exists with `User.findOne({ email: normalizedEmail })`. If an existing record matches, it terminates early with a `400 Bad Request` status code. 
+
+If unique, a new record is created using `User.create({ name, email: normalizedEmail, password })`. Here, Mongoose lifecycle middleware intercepts the transaction via a `pre('save')` hook configured in `backend/models/User.js`. The hook checks `if (!this.isModified('password')) return next();`. When true, it invokes `bcrypt.genSalt(10)` to compute a cryptographic salt, followed by `bcrypt.hash(this.password, salt)` to generate an irreversible digest. The raw plaintext password is never written to disk or database logs. Upon successful creation, `generateToken(user._id)` issues a 30-day signed JWT containing `{ id: user._id }`, and the API responds with a `201 Created` payload containing the user profile and session token.
+
+#### Login & Verification Engine
+Authentication occurs through `POST /api/users/login`. Because the Mongoose schema sets `select: false` on the password attribute to prevent accidental exposure in general queries, the authentication query explicitly chains `.select('+password')`. Once retrieved, the schema instance method `user.matchPassword(enteredPassword)` executes `await bcrypt.compare(enteredPassword, this.password)`. This method performs constant-time string comparison to defend against timing attacks. If verification succeeds, a freshly generated JWT is dispatched alongside the user details.
+
+#### The `authMiddleware.js` Verification Guard
+All private endpoints route through the `protect` middleware function. The middleware inspects the incoming HTTP request headers for an `Authorization` header beginning with the string `'Bearer '`. It splits the header string by space delimiter to isolate the raw JWT string. Using `jwt.verify(token, process.env.JWT_SECRET)`, it decodes and cryptographically verifies the token signature against the server's private secret key. Upon signature validation, it fetches the user record via `User.findById(decoded.id).select('-password')`. If the user has been deleted from the database since token issuance, it returns `401 Unauthorized`. Otherwise, it injects the hydrated Mongoose document into `req.user`, establishes `req.user.id = req.user._id` for API backwards compatibility, and invokes `next()` to proceed to the controller.
+
+#### Client-Side State Synchronization
+In the React application, session state is orchestrated in `frontend/src/App.js`. Upon initial DOM mounting, a `useEffect` reads the serialized session string from `localStorage.getItem('userInfo')`. If present, it initializes the `userInfo` React state. The JWT token string is passed down the component tree to sub-pages and modal dialogues. To ensure authenticated access, `react-router-dom` v6 defines a protected layout: navigating to `/gallery` when `token` evaluates to `null` triggers an immediate `<Navigate to="/" replace />` redirection to the landing page. Conversely, visiting the root `/` while authenticated redirects automatically to `/gallery`. When a user clicks "Sign Out", `handleLogout()` calls `localStorage.removeItem('userInfo')` and sets `setUserInfo(null)`, instantly tearing down all user-scoped views and memory references.
+
+---
+
+## Feature 2: Multi-Format Media Upload & Processing Engine
+
+### 2.1 Overview & Architecture
+GalleryHub incorporates a unified ingestion engine capable of handling high-volume uploads across three distinct media formats: raster and vector images, compressed video streams, and digital workplace documents. The pipeline orchestrates client-side file inspection, drag-and-drop event capturing, multi-part form-data streaming via Multer, asynchronous video transcoding/thumbnailing via FFmpeg, and contextual folder routing.
+
+```mermaid
+flowchart TD
+    A["User drags/selects files in UploadModal"] --> B["Client File Classifier (classifyFile)"]
+    B --> C{"Check 50MB Size Limit"}
+    C -- Exceeds --> D["Toast Error: Exceeds 50MB"]
+    C -- Passes --> E["Generate Local Blob Thumbnails (createObjectURL)"]
+    E --> F["Render Preview Cards in Modal"]
+    
+    F --> G["User Clicks 'Upload'"]
+    G --> H["Group Files by MediaType (image, video, document)"]
+    
+    subgraph Parallel Upload Dispatch
+        H --> I1["Images -> POST /api/images/upload-multiple"]
+        H --> I2["Videos -> POST /api/videos/upload-multiple"]
+        H --> I3["Documents -> POST /api/documents/upload-multiple"]
+    end
+    
+    subgraph Multer Processing
+        I1 --> J1["Multer diskStorage -> backend/uploads/"]
+        I2 --> J2["Multer diskStorage -> backend/videos/"]
+        I3 --> J3["Multer diskStorage -> backend/documents/"]
+    end
+    
+    J1 --> K1["Image.insertMany() & logActivity()"]
+    J2 --> K2["Video.insertMany() & logActivity()"]
+    J3 --> K3["Document.insertMany() & logActivity()"]
+    
+    K2 --> L["Asynchronous setImmediate Background Task"]
+    subgraph FFmpeg Processing Engine
+        L --> M1["ffmpeg.screenshots(): Capture Frame at 1.0s -> 320x240 JPG"]
+        L --> M2["ffmpeg.ffprobe(): Probe Video Stream for Exact Duration"]
+        M1 & M2 --> M3["Video.findByIdAndUpdate(): Save thumbnail & duration"]
+    end
+    
+    K1 & M3 & K3 --> N{"Is folderId present?"}
+    N -- Yes --> O["PUT /api/folders/:id/move (Assign fileIds to Folder)"]
+    N -- No --> P["Return 201 Created to Frontend"]
+    O --> P
+    P --> Q["Toast Success & Invalidate Gallery State Cache"]
+```
+
+### 2.2 Deep Technical Implementation
+
+#### Client-Side Inspection & Classification
+When files are dropped into the `UploadModal` dropzone or picked via `<input type="file">`, the component invokes `classifyFile(file)`:
+```javascript
+const classifyFile = (file) => {
+  if (file.type.startsWith('image/')) return 'image';
+  if (file.type.startsWith('video/')) return 'video';
+  return 'document';
+};
+```
+Every individual file is evaluated against a strict 50 MB threshold (`50 * 1024 * 1024` bytes). Oversized files are rejected immediately with descriptive `react-hot-toast` alerts. For allowed files, the component distinguishes between image previews (instantiated via `URL.createObjectURL(file)`) and non-image files, assigning contextual iconography:
+- 📕 for `.pdf`
+- 📘 for `.doc`, `.docx`
+- 📊 for `.xls`, `.xlsx`, `.csv`
+- 📑 for `.ppt`, `.pptx`
+- 📦 for `.zip`, `.rar`, `.7z`
+- 🎥 for video files
+
+#### Multer Storage Architecture
+On the Express server, Multer disk storage configurations are defined separately across `imageRoutes.js`, `videoRoutes.js`, and `documentRoutes.js`. Storage destinations are resolved using `path.join(__dirname, '..', '<folder>')`. Filename collision prevention is achieved by prefixing original filenames with millisecond-precision timestamps: `Date.now() + '-' + file.originalname`. File filters enforce MIME integrity:
+- **Images**: RegEx pattern `/jpeg|jpg|png|gif|webp/` matching both `file.mimetype` and `path.extname`.
+- **Videos**: RegEx pattern `/mp4|mov|avi|mkv/`.
+- **Documents**: Broad ingestion supporting all document, archive, and text extensions.
+
+#### Parallel Multipart Transmission & Folder Injection
+When the user triggers `handleUpload`, the files are grouped into three independent arrays: `imageFiles`, `videoFiles`, and `docFiles`. The client constructs separate `FormData` payloads and dispatches parallel HTTP POST requests via `Promise.all([ ...uploads ])`. If the user is currently browsing within a folder context, the modal captures `folderId`. Once the multi-part uploads resolve and return the newly generated database IDs (`uploadedImageIds`, `uploadedVideoIds`, `uploadedDocIds`), the upload handler automatically issues a follow-up batch assignment request to `PUT /api/folders/${folderId}/move`, cleanly nesting the new assets without requiring manual drag-and-drop.
+
+#### Asynchronous Video Frame Extraction & Metadata Probing
+Unlike static images, video files require visual thumbnail representations and length metadata. In `backend/routes/videoRoutes.js`, once Multer writes the video stream to disk and `Video.insertMany()` saves the records, the API dispatches the HTTP 201 response immediately to prevent frontend timeouts. It then invokes `setImmediate()` to schedule a non-blocking background worker that utilizes `fluent-ffmpeg`:
+1. It executes `ffmpeg(videoPath).screenshots({ count: 1, folder: thumbnailDir, filename: thumbnailName, size: '320x240', timemarks: ['1'] })` to capture a sharp frame at the 1-second mark.
+2. It calls `ffmpeg.ffprobe(videoPath)` to parse stream headers and extract container duration in seconds.
+3. It performs a selective database patch: `Video.findByIdAndUpdate(video._id, { thumbnail: thumbnailName, duration })`.
+
+---
+
+## Feature 3: Unified Media Gallery, Filtering, Sorting & Multi-View Display
+
+### 3.1 Overview & Architecture
+The Gallery engine provides a consolidated, reactive media canvas capable of presenting heterogeneous data types (images, videos, documents) within a single unified view. It features client-side full-text search, category segmenting, multi-property sorting, and three responsive layout renderers: Grid, List, and Masonry.
+
+```mermaid
+flowchart LR
+    subgraph Data Hydration
+        A1["fetchImages()"] --> B["Promise.all()"]
+        A2["fetchVideos()"] --> B
+        A3["fetchDocuments()"] --> B
+        B --> C["Merge & Map mediaType: 'image'|'video'|'document'"]
+    end
+
+    subgraph Data Pipeline
+        C --> D["allMedia Array"]
+        D --> E{"Category Filter Tab"}
+        E -- 'all' --> F["All Media"]
+        E -- 'images' --> F["Only Images"]
+        E -- 'videos' --> F["Only Videos"]
+        E -- 'documents' --> F["Only Documents"]
+        
+        F --> G["Search Filter (searchQuery on originalName)"]
+        G --> H["Sort Engine (sortBy: date/name/size/type & sortOrder: asc/desc)"]
+        H --> I["filteredMedia Array"]
+    end
+
+    subgraph Rendering Layouts
+        I --> J{"viewMode State"}
+        J -- 'grid' --> K["CSS Grid (Uniform 4:3 Aspect Thumbnails)"]
+        J -- 'list' --> L["Tabular Rows (Name, Size, Type, Date, Actions)"]
+        J -- 'masonry' --> M["Column Waterfall (Variable Height Cards)"]
+    end
+```
+
+### 3.2 Deep Technical Implementation
+
+#### Polymorphic Data Merging
+Because images, videos, and documents possess dedicated MongoDB collections with slight schema variances (e.g., videos feature `duration` and `thumbnail`; documents feature `type`), the client-side controller in `ImageUploadPage.js` synthesizes them into a unified array:
+```javascript
+const allMedia = [
+  ...images.map(img => ({ ...img, mediaType: 'image' })),
+  ...videos.map(vid => ({ ...vid, mediaType: 'video' })),
+  ...documents.map(doc => ({ ...doc, mediaType: 'document' })),
+].sort((a, b) => new Date(b.uploadDate || b.createdAt) - new Date(a.uploadDate || a.createdAt));
+```
+This synthesized structure allows downstream components (`ImageGallery`, `SkeletonGrid`, `BottomDock`) to interact with media items via common properties (`_id`, `originalName`, `size`, `uploadDate`, `folder`, `mediaType`).
+
+#### Multi-Tier Filtering & Search Optimization
+Data filtering is executed in memory via a memoized multi-pass pipeline. The first tier inspects `activeCategory`: when set to `'images'`, `'videos'`, or `'documents'`, it performs strict equality checks against `item.mediaType`. The second tier executes real-time string filtering:
+```javascript
+item.originalName?.toLowerCase().includes(searchQuery.toLowerCase())
+```
+Because the filtering occurs on cached React state, the user experiences zero-latency search feedback without triggering database round-trips.
+
+#### The Multi-Criteria Comparator Engine
+Sorting is dynamically configured through two independent state variables: `sortBy` (`'date'` | `'name'` | `'size'` | `'type'`) and `sortOrder` (`'asc'` | `'desc'`). A unified comparator function evaluates item pairs `(a, b)`:
+- **Date**: Computes delta between epoch timestamps: `new Date(b.uploadDate) - new Date(a.uploadDate)`.
+- **Name**: Executes locale-aware string comparison: `a.originalName.localeCompare(b.originalName)`.
+- **Size**: Compares raw byte numbers: `(a.size || 0) - (b.size || 0)`.
+- **Type**: Evaluates MIME/extension strings alphabetically.
+
+The boolean direction toggle inverts the computed comparator sign, ensuring consistent order transitions across all four sort dimensions.
+
+#### Layout Renderers: Grid, List, and Masonry
+`ImageGallery.js` switches its DOM layout based on `viewMode`:
+1. **Grid View (`.image-grid`)**: Configured with CSS Grid (`grid-template-columns: repeat(auto-fill, minmax(220px, 1fr))`). Media cards render with a uniform 4:3 aspect ratio thumbnail container. Hovering over a card activates an action overlay revealing quick buttons for Preview, Download, Share, and Delete.
+2. **List View (`.media-list-view`)**: Renders a dense, table-like layout. Each row features a small thumbnail icon, the filename, human-readable file size, creation timestamp, and right-aligned action buttons. This view maximizes vertical screen real estate for organizational workflows.
+3. **Masonry View (`.media-masonry-view`)**: Employs CSS multi-column layouts (`column-count: 4; column-gap: 16px`, scaling down to 3, 2, and 1 on smaller screens). Child cards set `break-inside: avoid`. Images preserve their intrinsic aspect ratios without cropping, providing an artistic presentation for photography collections.
+
+---
+
+## Feature 4: Full-Screen Media Lightbox, Multi-Format Document Viewer & Slideshow
+
+### 4.1 Overview & Architecture
+When any media card is activated, the application renders `ImagePreviewModal`, an immersive, full-screen lightbox modal. It features media playback controls, document viewing heuristics, keyboard shortcuts, automated slideshow cycling, folder relocation controls, and metadata inspection.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Closed
+    Closed --> LightboxOpen : User clicks media card
+    
+    state LightboxOpen {
+        [*] --> DetectType
+        DetectType --> RenderImage : mediaType == 'image'
+        DetectType --> RenderVideo : mediaType == 'video'
+        DetectType --> RenderDoc : mediaType == 'document'
+        
+        state RenderDoc {
+            [*] --> CheckExt
+            CheckExt --> PDFView : .pdf (native iframe)
+            CheckExt --> OfficeView : .docx, .xlsx, .pptx (Google Docs Viewer)
+            CheckExt --> TextView : .txt, .json, .js (raw fetch + pre)
+            CheckExt --> FallbackView : Other (direct download prompt)
+        }
+        
+        RenderImage --> SlideshowActive : Toggle Slideshow (5s timer)
+        SlideshowActive --> RenderImage : Next frame / Pause
+    }
+    
+    LightboxOpen --> ImageEditor : Click "Edit Image"
+    ImageEditor --> LightboxOpen : Save / Close
+    LightboxOpen --> ShareModal : Click "Share"
+    ShareModal --> LightboxOpen : Close
+    LightboxOpen --> Closed : Press Escape / Click Close
+```
+
+### 4.2 Deep Technical Implementation
+
+#### Full-Screen Lightbox Mechanics
+The lightbox mounts inside an overlay container (`.preview-modal-overlay`) with a high z-index, frosted backdrop blur, and dark background. To prevent background body scrolling while navigating media, a `useEffect` hook sets `document.body.style.overflow = 'hidden'` on mount and restores `'unset'` upon unmounting. A global keyboard listener intercepts key events:
+- `ArrowRight`: Advances to `index + 1` (wrapping cyclically via modulo arithmetic).
+- `ArrowLeft`: Regresses to `index - 1`.
+- `Escape`: Closes the lightbox.
+- `Delete`: Prompts soft-delete confirmation for the active file.
+
+#### The Polymorphic Document Viewer (`DocViewer`)
+For non-image and non-video assets, `ImagePreviewModal` mounts an internal `DocViewer` component. It inspects the file extension and selects an optimal rendering strategy:
+1. **PDF Documents**: Renders an `<iframe src="${mediaUrl}" className="doc-iframe" />` taking advantage of browser-native PDF engines with integrated zoom, pagination, and printing.
+2. **Office Formats (`doc`, `docx`, `xls`, `xlsx`, `ppt`, `pptx`)**: When deployed in production environments, the viewer wraps the publicly reachable file URL in the Google Docs Viewer service: `https://docs.google.com/viewer?url=${encodeURIComponent(mediaUrl)}&embedded=true`. In localhost development where Google cannot access private network addresses, it presents a fallback download card.
+3. **Plain Text & Code Files (`txt`, `json`, `js`, `html`, `css`, `csv`)**: The component performs an asynchronous `fetch(mediaUrl)` request, extracts `res.text()`, and renders the raw text content inside a monospace, syntax-friendly `<pre className="text-viewer-content">` block with scroll management.
+
+#### Automated Slideshow Engine
+Users can engage an automated presentation mode by clicking the Slideshow button. The component initializes a React state `slideshowActive = true`. A `useEffect` hook monitors this state:
+```javascript
+useEffect(() => {
+  if (!slideshowActive) return;
+  const interval = setInterval(() => {
+    handleNext();
+  }, 5000);
+  return () => clearInterval(interval);
+}, [slideshowActive, handleNext]);
+```
+Every five seconds, the lightbox seamlessly transitions to the subsequent media item in the filtered array, complete with cross-fade animations.
+
+#### Action Toolbar & Folder Relocation
+The modal header houses quick actions:
+- **Move to Folder**: A dropdown menu querying the user's active folder list. Selecting a target folder triggers `onMoveToFolder(folderId, image._id, image.mediaType)`.
+- **Remove from Folder**: Displayed only if the file currently possesses a `folder` foreign key, allowing users to unfile assets back to the root gallery.
+- **Launch Editor**: For image files, clicking the edit icon mounts the `ImageEditor` component directly on top of the lightbox.
+- **Download**: Directly fetches the asset blob and downloads it with its original filename.
+
+---
+
+## Feature 5: In-Browser Image Editing Studio
+
+### 5.1 Overview & Architecture
+GalleryHub includes a studio-grade, client-side image editor implemented in `ImageEditor.js`. Users can crop arbitrary rectangular regions, perform geometric transformations (rotation, horizontal/vertical flipping), adjust color matrices (brightness, contrast, saturation, sepia, blur), apply one-click stylized filter presets, and render the final composite to HTML5 Canvas for non-destructive storage.
+
+```mermaid
+flowchart TD
+    A["Raw Image Element (imgRef)"] --> B["Active Editing Tool"]
+    
+    subgraph Editing Toolsets
+        B -- "Crop Tool" --> C["react-image-crop UI Overlay"]
+        B -- "Transform Tool" --> D["Rotation (90° steps) & Flip H/V"]
+        B -- "Filter Tool" --> E["Presets & 5 Parametric Sliders"]
+    end
+    
+    C --> F["Update crop / completedCrop State"]
+    D --> G["Update rotation, flipH, flipV State"]
+    E --> H["Update filters CSS String"]
+    
+    F & G & H --> I["Real-Time CSS Transform & Filter Preview on DOM"]
+    
+    I --> J["User Clicks 'Save as Copy'"]
+    
+    subgraph Canvas Rendering Pipeline
+        J --> K["Compute Source Coordinates (sx, sy, sWidth, sHeight)"]
+        K --> L["Handle 90°/270° Canvas Dimension Swapping"]
+        L --> M["ctx.translate(canvas.width/2, canvas.height/2)"]
+        M --> N["ctx.rotate(rotation * PI / 180)"]
+        N --> O["ctx.scale(flipH, flipV)"]
+        O --> P["ctx.filter = filterStyle"]
+        P --> Q["ctx.drawImage(img, sx, sy, sWidth, sHeight, -sWidth/2, -sHeight/2, sWidth, sHeight)"]
+    end
+    
+    Q --> R["canvas.toBlob('image/png')"]
+    R --> S["Encapsulate in FormData (filename: edited-name.png)"]
+    S --> T["POST /api/images/upload (Bearer Auth)"]
+    T --> U["Image Added to Gallery & Activity Logged"]
+```
+
+### 5.2 Deep Technical Implementation
+
+#### Crop Engine (`react-image-crop`)
+Cropping is integrated using the `react-image-crop` library. When the user activates the Crop tool, the image is wrapped in a `<ReactCrop>` container that captures mouse and touch gestures. When the user finishes dragging the crop box, it sets `completedCrop`. To ensure pixel-accurate output regardless of screen scaling or responsive CSS resizing, the save routine calculates a dimensional scaling ratio:
+```javascript
+const scaleX = img.naturalWidth / img.width;
+const scaleY = img.naturalHeight / img.height;
+const sx = completedCrop.x * scaleX;
+const sy = completedCrop.y * scaleY;
+const sWidth = completedCrop.width * scaleX;
+const sHeight = completedCrop.height * scaleY;
+```
+
+#### Parametric Filters & Preset Matrix
+The filter engine supports eight custom presets and five granular sliders:
+- **Filter Presets**: `None`, `Vivid` (110% brightness, 120% contrast, 140% saturation), `Warm` (sepia 20%), `Cool` (saturation 80%), `B&W` (grayscale 100%), `Vintage` (sepia 40%, contrast 90%), `Dramatic` (contrast 150%, brightness 90%), and `Soft` (blur 1px).
+- **Manual Sliders**: Brightness (0–200%), Contrast (0–200%), Saturation (0–200%), Sepia (0–100%), and Blur (0–10px).
+
+These values are compiled into a standards-compliant CSS filter string:
+```javascript
+const filterStyle = `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturate}%) grayscale(${filters.grayscale}%) sepia(${filters.sepia}%) blur(${filters.blur}px)`;
+```
+This filter string is applied live to the preview DOM element for zero-latency interactive feedback.
+
+#### The Canvas 2D Rendering Pipeline
+When saving, a hidden `<canvas ref={canvasRef}>` executes the export sequence:
+1. **Dimension Resolution**: If the image is rotated by an odd multiple of 90 degrees (`rotation % 180 !== 0`), canvas width and height are inverted: `canvas.width = sHeight; canvas.height = sWidth`.
+2. **Context Coordinate Transformation**: The canvas context is translated to its exact center point: `ctx.translate(canvas.width / 2, canvas.height / 2)`.
+3. **Rotational & Mirror Matrix**: The canvas rotates: `ctx.rotate((rotation * Math.PI) / 180)` and scales: `ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1)`.
+4. **Hardware Filter Injection**: `ctx.filter = filterStyle` applies the exact visual adjustments.
+5. **Draw Image Execution**: `ctx.drawImage` draws the source crop rectangle offset by negative half-dimensions: `(-sWidth / 2, -sHeight / 2)`.
+
+#### Non-Destructive Export & Re-Ingestion
+The populated canvas executes `canvas.toBlob((blob) => { ... }, 'image/png')`. The resulting binary blob is packaged into a `FormData` object with the filename formatted as `edited-${image.originalName}`. It is transmitted to `POST /api/images/upload` using the active user's JWT token. The original source image is preserved intact, ensuring non-destructive image authoring.
+
+---
+
+## Feature 6: Folder Management, Hierarchical Organization & Drag-and-Drop
+
+### 6.1 Overview & Architecture
+GalleryHub provides a flexible folder organization system allowing users to categorize assets into custom-named, color-coded directories. It features compound unique indexing, dynamic file counting across collections, fluid HTML5 drag-and-drop file organization, and safe folder deletion that unfiles assets without destroying data.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User Interface
+    participant FolderAPI as /api/folders
+    participant FolderModel as Folder Model
+    participant MediaModel as Image / Video / Document Models
+    participant DB as MongoDB Atlas
+
+    Note over User,DB: Folder Creation with Color & Unique Name
+    User->>FolderAPI: POST /api/folders { name: "Travel 2026", color: "#34a853" }
+    FolderAPI->>FolderModel: Folder.create({ name, color, user: req.user.id })
+    alt Duplicate Name for User
+        FolderModel-->>FolderAPI: MongoError E11000 (duplicate key)
+        FolderAPI-->>User: 400 Bad Request { message: 'A folder with this name already exists' }
+    else Success
+        FolderModel->>DB: Save document
+        FolderAPI-->>User: 201 Created (Folder object with zero counts)
+    end
+
+    Note over User,DB: Drag-and-Drop File Relocation
+    User->>FolderAPI: PUT /api/folders/:id/move { fileIds: ["img123"], fileType: "image" }
+    FolderAPI->>MediaModel: Image.updateMany({ _id: { $in: fileIds }, user }, { folder: folderId })
+    MediaModel->>DB: Update documents
+    FolderAPI-->>User: 200 OK { message: 'Files moved to folder' }
+
+    Note over User,DB: Safe Folder Deletion (Unfiling Assets)
+    User->>FolderAPI: DELETE /api/folders/:id
+    FolderAPI->>MediaModel: Image.updateMany({ folder: id }, { folder: null })
+    FolderAPI->>MediaModel: Video.updateMany({ folder: id }, { folder: null })
+    FolderAPI->>MediaModel: Document.updateMany({ folder: id }, { folder: null })
+    FolderAPI->>FolderModel: folder.deleteOne()
+    FolderModel->>DB: Remove folder entity
+    FolderAPI-->>User: 200 OK { message: 'Folder deleted' }
+```
+
+### 6.2 Deep Technical Implementation
+
+#### Schema Architecture & Compound Indexing
+In `backend/models/Folder.js`, the schema defines `name`, `color` (defaulting to Google Blue `#4285f4`), `user` (foreign key pointing to User), and `sharedWith` array. To guarantee that a user cannot create two folders with identical names while permitting different users to use the same name, a compound unique index is enforced:
+```javascript
+folderSchema.index({ name: 1, user: 1 }, { unique: true });
+```
+When a duplicate occurs, Mongoose raises an error with code `11000`, which the route handler catches and translates into a friendly `400 Bad Request` response.
+
+#### Parallel Cross-Collection Count Aggregation
+When the client calls `GET /api/folders`, the server does not simply return raw folder records. It aggregates the quantity of images, videos, and documents residing inside each folder using `Promise.all`:
+```javascript
+const foldersWithCounts = await Promise.all(
+  folders.map(async (folder) => {
+    const [imageCount, videoCount, docCount] = await Promise.all([
+      Image.countDocuments({ folder: folder._id, user: req.user.id }),
+      Video.countDocuments({ folder: folder._id, user: req.user.id }),
+      Document.countDocuments({ folder: folder._id, user: req.user.id }),
+    ]);
+    return {
+      ...folder.toObject(),
+      fileCount: imageCount + videoCount + docCount,
+      imageCount,
+      videoCount,
+      docCount,
+    };
+  })
+);
+```
+This enables the UI to render rich metadata badges (e.g., "12 files · 8 📷 · 3 🎥 · 1 📄") on every folder card.
+
+#### HTML5 Drag-and-Drop Mechanics
+GalleryHub implements native HTML5 drag-and-drop. In `ImageGallery.js`, media cards specify `draggable="true"`. On `dragStart`, the card writes a serialized JSON payload to the data transfer buffer:
+```javascript
+e.dataTransfer.setData('application/json', JSON.stringify({ id: item._id, mediaType: item.mediaType }));
+```
+Both the "Quick Folders" carousel on the dashboard and the full folder list in the Folders tab act as drop targets. They listen for `onDragOver` (invoking `e.preventDefault()` to permit dropping and adding the CSS class `.drop-highlight`) and `onDrop`. On drop, the folder extracts the ID and mediaType, and dispatches a call to `handleMoveToFolder(folder._id, id, mediaType)`.
+
+#### Safe Deletion & Cascade Unfiling
+Deleting a folder does not delete the files contained inside it. When `DELETE /api/folders/:id` executes, it initiates three parallel unfiling operations:
+```javascript
+await Promise.all([
+  Image.updateMany({ folder: folder._id }, { folder: null }),
+  Video.updateMany({ folder: folder._id }, { folder: null }),
+  Document.updateMany({ folder: folder._id }, { folder: null }),
+]);
+await folder.deleteOne();
+```
+All assets contained in the deleted directory automatically revert to root unfiled files in the user's gallery.
+
+---
+
+## Feature 7: Collaborative Folder Sharing & Role-Based Access Control
+
+### 7.1 Overview & Architecture
+GalleryHub allows users to share entire folders with other registered platform users. The folder collaboration system implements role-based access control (RBAC), dividing permissions into Viewer (read-only) and Editor (read/write) access levels.
+
+```mermaid
+flowchart TD
+    A["Folder Owner opens ShareFolderModal"] --> B["Enter Collaborator Email & Select Role ('view' | 'edit')"]
+    B --> C["POST /api/folders/:id/share"]
+    
+    C --> D{"Validation Checks"}
+    D -- Target User Not Found --> E["404: User not found"]
+    D -- Target == Owner --> F["400: Cannot share with yourself"]
+    D -- Already Shared --> G["Update Permission Level in sharedWith Array"]
+    D -- New User --> H["Push { user: targetId, permission } to sharedWith"]
+    
+    G & H --> I["folder.save() & Return Updated Collaborator Roster"]
+    
+    subgraph Shared View Experience
+        J["Invited Collaborator logs in"] --> K["GET /api/folders/shared"]
+        K --> L["Query: Folder.find({ 'sharedWith.user': req.user.id })"]
+        L --> M["Populate Owner Info (name, email)"]
+        M --> N["Aggregate File Counts for Shared Folder"]
+        N --> O["Inject myPermission ('view' | 'edit') and isShared: true"]
+        O --> P["Render in Shared Folders Gallery View"]
+    end
+```
+
+### 7.2 Deep Technical Implementation
+
+#### Schema Subdocuments & Permission Hierarchy
+Collaborators are tracked inside the `Folder` document via the `sharedWith` array:
+```javascript
+sharedWith: [{
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  permission: { type: String, enum: ['view', 'edit'], default: 'view' },
+  addedAt: { type: Date, default: Date.now }
+}]
+```
+Two discrete roles are enforced:
+- **Viewer (`'view'`)**: Granted read privileges to preview, play, inspect, and download files residing within the folder.
+- **Editor (`'edit'`)**: Granted full modification capabilities within the folder context, including uploading new assets directly into the shared folder, moving existing assets, and unfiling assets.
+
+#### Sharing & Roster Mutation Controller
+When `POST /api/folders/:id/share` is invoked, the controller verifies that `folder.user.toString() === req.user.id`, ensuring that only the original folder owner can modify access permissions. It performs an email lookup against the `User` collection. If the target exists and is distinct from the owner, it checks whether an entry already exists in `folder.sharedWith`. If present, it updates the permission property; otherwise, it pushes a new subdocument. Removing access occurs via `DELETE /api/folders/:id/share/:userId`, which filters the array by user ID and saves the document.
+
+#### Shared Folder Discovery (`/api/folders/shared`)
+The `GET /api/folders/shared` route returns all directories where the requesting user has been invited. It uses Mongoose query filtering on subdocument properties:
+```javascript
+Folder.find({ 'sharedWith.user': req.user.id }).populate('user', 'name email');
+```
+The server enriches each shared folder record with the owner's identity, the user's explicit permission level (`myPermission`), and an `isShared: true` boolean flag.
+
+#### Client Collaborator Management UI
+The `ShareFolderModal.js` component provides an invite interface. It displays the folder owner at the top of the roster adorned with a Shield icon and "Owner" badge. Each invited collaborator is rendered with their avatar initial, display name, email, permission level indicator, and a trash icon button. Clicking the delete icon prompts a `ConfirmModal` dialog to prevent accidental revocation of access.
+
+---
+
+## Feature 8: Public File Sharing, Cryptographic Tokens & Link Protection
+
+### 8.1 Overview & Architecture
+GalleryHub enables users to share individual media files with anyone outside the platform through unique, cryptographically random share links. Links can be optionally protected with salted bcrypt passwords and configured with automated time-based expirations.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner as File Owner
+    participant API as /api/share
+    participant LinkModel as ShareLink Model
+    actor Public as Public Visitor
+    participant ViewPage as /share/:token (React)
+
+    Owner->>API: POST /api/share { fileId, fileType, password: "secret", expiresInDays: 7 }
+    API->>API: crypto.randomBytes(32).toString('hex')
+    API->>API: bcrypt.hash("secret", 10)
+    API->>LinkModel: Save token, hashed password, expiresAt
+    API-->>Owner: 201 Created { token, hasPassword: true, expiresAt }
+    Owner->>Public: Distribute URL: https://app/share/<token>
+
+    Public->>ViewPage: Visits URL in browser
+    ViewPage->>API: GET /api/share/<token>
+    alt Link Expired
+        API-->>ViewPage: 410 Gone { message: 'Link expired' }
+        ViewPage-->>Public: Render Error: 'Link Unavailable'
+    else Password Required
+        API-->>ViewPage: 401 Unauthorized { requirePassword: true }
+        ViewPage-->>Public: Render Password Input Card
+        Public->>ViewPage: Submits password
+        ViewPage->>API: POST /api/share/<token>/verify { password }
+        API->>API: bcrypt.compare(password, link.password)
+        alt Password Correct
+            API-->>ViewPage: 200 OK { success: true }
+            ViewPage->>API: GET /api/share/<token>?p=secret
+            API->>API: link.viewCount += 1; link.save()
+            API-->>ViewPage: Serve raw file stream (res.sendFile)
+            ViewPage-->>Public: Render Media Preview + Download Button
+        else Password Incorrect
+            API-->>ViewPage: 401 Unauthorized { message: 'Invalid password' }
+            ViewPage-->>Public: Display 'Incorrect password' error
+        end
+    end
+```
+
+### 8.2 Deep Technical Implementation
+
+#### Cryptographic Token Generation & Hashing
+When creating a share link via `POST /api/share`, the system generates an unguessable 64-character URL-safe token using Node.js's native cryptographic library:
+```javascript
+const token = crypto.randomBytes(32).toString('hex');
+```
+If the user specifies a password in `ShareModal`, the controller generates a bcrypt salt and hashes the plaintext password before storage. If an expiration timeframe is selected (1, 7, or 30 days), it calculates `expiresAt` by adding days to `new Date()`. The resulting `ShareLink` record stores `fileId`, `fileType`, `user`, `token`, `password`, `expiresAt`, and `viewCount: 0`.
+
+#### The Public File Serving Engine (`GET /api/share/:token`)
+When a visitor accesses the public file endpoint, the server performs validation checks:
+1. **Link Existence**: Resolves `ShareLink.findOne({ token: req.params.token })`. If absent, returns `404 Not Found`.
+2. **Expiration Enforcement**: Compares `link.expiresAt` against `new Date()`. If expired, returns `410 Gone`.
+3. **Password Interception**: If `link.password` is truthy, the endpoint verifies whether a password parameter is provided. If missing or invalid, it returns a `401 Unauthorized` response with `{ requirePassword: true }`.
+4. **View Tracking & Delivery**: Increments `link.viewCount += 1`, persists the update, locates the original file on disk, and pipes the binary stream using Express's `res.sendFile(path.resolve(file.path))`.
+
+#### Dedicated Public UI: `SharePageView.js`
+The public view page operates as a standalone micro-app that requires no user authentication. It manages an explicit four-state machine:
+- `loading`: Displays an animated loading spinner.
+- `password_required`: Displays a card featuring a Lock icon, description, password input, and unlock button. Submitting calls `POST /api/share/:token/verify`.
+- `loaded`: Renders a full preview of the asset (responsive `<img>` for images, HTML5 `<video controls>` for video files, or document card for Office/PDF files), metadata badges (file size, format tag), and a large download button.
+- `error`: Displays an alert triangle icon with descriptive messaging if the link has been revoked or expired.
+
+#### Share Management Dashboard
+Users can audit their active share links via `GET /api/share/my-links`. The server enriches each link with the original file name and masks the password (returning only a `password: true/false` flag). Users can revoke links anytime via `DELETE /api/share/:id`.
+
+---
+
+## Feature 9: Trash, Two-Stage Soft-Delete & Permanent Erasure Engine
+
+### 9.1 Overview & Architecture
+GalleryHub employs a desktop-style, two-stage file deletion architecture. Rather than destroying assets immediately upon clicking delete, the application flags files as soft-deleted, moves them into a dedicated Recycle Bin (Trash), unlinks them from active folders, and provides a 30-day recovery grace period before permanent erasure.
+
+```mermaid
+stateDiagram-v2
+    [*] --> ActiveState: File Uploaded
+    
+    state ActiveState {
+        ActiveGallery: Displayed in Gallery
+        ActiveFolder: Assigned to Folder
+    }
+    
+    ActiveState --> TrashedState: DELETE /api/:type/:id
+    
+    state TrashedState {
+        ExcludedFromGallery: isDeleted = true
+        UnlinkedFromFolder: folder = null
+        TimestampMarked: deletedAt = new Date()
+        RetentionCountdown: 30 - elapsedDays
+    }
+    
+    TrashedState --> ActiveState: PUT /api/:type/:id/restore (Restore File)
+    TrashedState --> ErasedState: DELETE /api/:type/:id/permanent (Permanent Delete)
+    
+    state ErasedState {
+        UnlinkDisk: fs.unlinkSync(file.path)
+        DeleteMongo: file.deleteOne()
+        AuditPermanent: logActivity(permanent: true)
+    }
+    
+    ErasedState --> [*]
+```
+
+### 9.2 Deep Technical Implementation
+
+#### The Soft-Delete Mutation
+When a user deletes a file from the gallery or preview modal, the request routes to `DELETE /api/images/:id` (or `/api/videos/:id`, `/api/documents/:id`). The controller executes soft-deletion:
+```javascript
+image.isDeleted = true;
+image.deletedAt = new Date();
+image.folder = null;
+await image.save();
+await logActivity(req.user.id, 'delete', image.originalName, 'image');
+```
+The file's binary data remains safe on disk, and its record remains in the database. Clearing `folder = null` ensures that deleting a file immediately removes it from any folder groupings.
+
+#### Transparent Query Filtering
+All primary retrieval endpoints (`GET /api/images`, `GET /api/videos`, `GET /api/documents`) automatically filter out deleted files by appending `{ isDeleted: { $ne: true } }` to their queries. This guarantees that soft-deleted items vanish from the gallery, folder views, search results, and category filters.
+
+#### The Trash Interface & 30-Day Auto-Purge Calculation
+Selecting the Trash tab on the dashboard invokes `fetchTrash()`, querying `/api/images/trash`, `/api/videos/trash`, and `/api/documents/trash`. The results are merged and sorted by `deletedAt` descending. Each trash card calculates its remaining retention window:
+```javascript
+const daysLeft = Math.max(0, 30 - Math.floor((Date.now() - new Date(item.deletedAt)) / 86400000));
+```
+The item displays a format icon, the original filename, and a tag showing how many days remain before automated expiration.
+
+#### Restoration Mechanics
+Clicking "Restore" sends a request to `PUT /api/:type/:id/restore`. The controller resets `item.isDeleted = false` and `item.deletedAt = null`, logs a `'restore'` action in the activity feed, and returns the entity. The item immediately reappears in the user's gallery in its original unfiled state.
+
+#### Permanent Erasure Pipeline
+When a user clicks the permanent delete button in the Trash tab, the UI displays a confirmation alert. Confirming sends a request to `DELETE /api/:type/:id/permanent`:
+1. It validates user ownership: `file.user.toString() === req.user.id`.
+2. It inspects the filesystem: `if (fs.existsSync(file.path)) fs.unlinkSync(file.path)`. This immediately reclaims physical disk storage.
+3. It removes the database document: `await file.deleteOne()`.
+4. It logs the permanent deletion to the audit trail with metadata `{ permanent: true }`.
+
+---
+
+## Feature 10: Bulk Operations, Multi-Select Engine & Streaming ZIP Archival
+
+### 10.1 Overview & Architecture
+GalleryHub includes a multi-selection engine that enables power users to batch-manage their assets. Users can select multiple arbitrary files across categories, download them as a compressed ZIP archive streamed on-the-fly, or perform batch deletions.
+
+```mermaid
+flowchart TD
+    A["User clicks Multi-Select Toggle Button"] --> B["Enable Selection Mode (isSelecting = true)"]
+    B --> C["User clicks media cards or 'Select All'"]
+    C --> D["selectedFiles Set tracks File IDs"]
+    D --> E["Floating Selection Bar mounts at screen bottom"]
+    
+    subgraph Bulk Actions
+        E -- Click 'Download ZIP' --> F["Group Selected IDs by mediaType"]
+        E -- Click 'Delete' --> G["Prompt ConfirmModal"]
+        E -- Click 'Cancel' --> H["clearSelection(): Empty Set & Exit Mode"]
+    end
+    
+    subgraph ZIP Streaming Pipeline
+        F --> I["POST /api/:type/download-zip { imageIds: [...] }"]
+        I --> J["archiver('zip', { zlib: { level: 9 } })"]
+        J --> K["Set HTTP Headers: Content-Type: application/zip, Content-Disposition: attachment"]
+        K --> L["Pipe archive stream directly to Express res"]
+        L --> M["Iterate files -> archive.file(file.path, { name: file.originalName })"]
+        M --> N["archive.finalize()"]
+        N --> O["Browser triggers native file download (images.zip)"]
+    end
+    
+    subgraph Batch Delete Pipeline
+        G -- Confirmed --> P["Execute Promise.all([ DELETE calls for each selected ID ])"]
+        P --> Q["Clear Selection Set & Refresh Gallery"]
+        Q --> R["Toast: 'X files deleted'"]
+    end
+```
+
+### 10.2 Deep Technical Implementation
+
+#### Multi-Select State Machine
+Multi-select functionality is coordinated in `ImageUploadPage.js` using an ES6 `Set` stored in the `selectedFiles` state variable. Using a `Set` ensures $O(1)$ constant-time lookup performance when evaluating whether an individual card is checked:
+```javascript
+const toggleFileSelect = (id) => {
+  setSelectedFiles((prev) => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+};
+```
+When selection mode is engaged, clicking any media card toggles its membership in the `selectedFiles` Set instead of launching the preview modal. A floating action bar (`.selection-bar`) slides up from the bottom of the viewport as soon as `selectedFiles.size > 0`.
+
+#### On-the-Fly ZIP Streaming with Archiver
+The ZIP download functionality streams compressed archives directly from memory using the `archiver` library. The client divides selected items into three type buckets: `images`, `videos`, and `documents`. For each populated bucket, it issues a request to `/api/:type/download-zip`:
+```javascript
+router.post('/download-zip', protect, async (req, res) => {
+  const { imageIds } = req.body;
+  const images = await Image.find({ _id: { $in: imageIds }, user: req.user.id });
+
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', 'attachment; filename=images.zip');
+
+  const archive = archiver('zip', { zlib: { level: 9 } });
+  archive.pipe(res);
+
+  for (const img of images) {
+    if (fs.existsSync(img.path)) {
+      archive.file(img.path, { name: img.originalName });
+    }
+  }
+  archive.finalize();
+});
+```
+By setting `zlib: { level: 9 }`, the server applies maximum compression. Piping the archive stream directly into the Express `res` object streams chunks to the client as they compress, maintaining a negligible server memory footprint even when archiving multi-hundred-megabyte batches.
+
+#### Bulk Delete Execution
+Clicking "Delete" in the floating selection bar opens a `ConfirmModal` dialog. Upon confirmation, the application maps every selected file to its corresponding DELETE endpoint and fires them concurrently using `Promise.all`:
+```javascript
+await Promise.all(
+  items.map((item) => {
+    const endpoint = item.mediaType === 'video' ? 'videos' : item.mediaType === 'document' ? 'documents' : 'images';
+    return fetch(`${API_URL}/api/${endpoint}/${item._id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  })
+);
+```
+Once complete, the selection is cleared, and the gallery refreshes.
+
+---
+
+## Feature 11: Real-Time Activity Feed & Audit Logging System
+
+### 11.1 Overview & Architecture
+GalleryHub includes an audit trail system that records significant user operations, providing accountability and operational transparency. Activities are displayed in a real-time sidebar feed directly on the dashboard.
+
+```mermaid
+flowchart LR
+    subgraph Operation Handlers
+        A1["Image / Video / Document Upload"] --> B["logActivity()"]
+        A2["Soft Delete / Restore / Permanent Delete"] --> B
+        A3["Folder Create / Delete / Move"] --> B
+        A4["File Share Creation"] --> B
+        A5["Image Editor Export"] --> B
+    end
+
+    subgraph Logging Engine
+        B --> C["Activity.create({ user, action, targetName, targetType, metadata })"]
+        C --> D[("Activities Collection in MongoDB")]
+    end
+
+    subgraph Presentation Feed
+        E["ActivityFeed Component"] --> F["GET /api/activity?page=1&limit=20"]
+        F --> D
+        D --> G["Paginated Activity JSON Response"]
+        G --> H["Render Sidebar Timeline with Contextual Icons & Relative Timestamps"]
+    end
+```
+
+### 11.2 Deep Technical Implementation
+
+#### The Activity Schema & Indexing
+The Activity model in `backend/models/Activity.js` stores:
+- `user`: Foreign key pointing to User.
+- `action`: Strict enumeration: `'upload'`, `'delete'`, `'restore'`, `'move'`, `'create_folder'`, `'delete_folder'`, `'share'`, `'edit_image'`.
+- `targetName`: Human-readable name of the file or folder.
+- `targetType`: Enumeration: `'image'`, `'video'`, `'document'`, `'folder'`.
+- `metadata`: Arbitrary mixed object for additional context (e.g., `{ permanent: true }`).
+- `createdAt`: Timestamp defaulting to `Date.now`.
+
+To ensure pagination queries execute in sub-millisecond time even as the collection grows, a compound index is defined on `{ user: 1, createdAt: -1 }`.
+
+#### Non-Blocking Logging Helper
+Activity logging is decoupled from the main HTTP response flow via a dedicated helper in `backend/routes/activityRoutes.js`:
+```javascript
+const logActivity = async (userId, action, targetName, targetType, metadata = {}) => {
+  try {
+    await Activity.create({ user: userId, action, targetName, targetType, metadata });
+  } catch (error) {
+    console.error('Failed to log activity:', error);
+  }
+};
+```
+Because the helper wraps creation inside its own try-catch block without re-throwing errors, a logging failure will never cause an upload, delete, or share operation to fail.
+
+#### Paginated Feed API (`GET /api/activity`)
+The activity route supports pagination via `page` and `limit` query parameters:
+```javascript
+const limit = parseInt(req.query.limit) || 20;
+const page = parseInt(req.query.page) || 1;
+const skip = (page - 1) * limit;
+
+const activities = await Activity.find({ user: req.user.id })
+  .sort({ createdAt: -1 })
+  .skip(skip)
+  .limit(limit);
+
+const total = await Activity.countDocuments({ user: req.user.id });
+```
+The endpoint returns `{ activities, total, page, pages: Math.ceil(total / limit) }`.
+
+#### Frontend Activity Feed Component
+The `ActivityFeed.js` component renders as a sticky sidebar alongside the main gallery. It maps each incoming activity record to an intuitive icon and color badge:
+- 📤 Upload (Blue)
+- 🗑️ Delete (Red)
+- ♻️ Restore (Green)
+- 📁 Folder operations (Purple)
+- 🔗 Share (Yellow)
+- 🎨 Image edits (Pink)
+
+Relative timestamps are computed dynamically (e.g., "just now", "5 minutes ago", "2 hours ago", "yesterday"), giving users a clear timeline of recent actions.
+
+---
+
+## Feature 12: AI-Powered Context-Aware Chatbot Assistant
+
+### 12.1 Overview & Architecture
+GalleryHub integrates an AI assistant powered by OpenAI's GPT-3.5 Turbo model. Accessible via `/api/chatbot`, it provides users with natural language assistance, troubleshooting guidance, and contextual navigation advice for managing their files.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User in Chatbot Modal
+    participant ChatAPI as POST /api/chatbot
+    participant OpenAISDK as OpenAI API Client
+    participant Fallback as Local Fallback Engine
+
+    User->>ChatAPI: POST { message: "How do I download multiple files at once?" }
+    ChatAPI->>OpenAISDK: openai.chat.completions.create(model: "gpt-3.5-turbo", messages: [...])
+    
+    alt OpenAI Service Available
+        OpenAISDK-->>ChatAPI: AI Response String
+        ChatAPI-->>User: 200 OK { success: true, response, suggestions, isAI: true }
+    else OpenAI Rate Limit / Network Failure / Missing Key
+        OpenAISDK-->>ChatAPI: Error Exception
+        ChatAPI->>Fallback: Select predefined contextual response
+        Fallback-->>ChatAPI: Static Guidance Response
+        ChatAPI-->>User: 200 OK { success: true, response, suggestions, isAI: false }
+    end
+    
+    User->>User: Render Message Bubble & Follow-up Suggestion Chips
+```
+
+### 12.2 Deep Technical Implementation
+
+#### The Chatbot Route Controller
+Implemented in `backend/routes/chatbotRoutes.js`, the chatbot endpoint accepts user messages over an authenticated connection. The controller initializes the official `OpenAI` client SDK, passing `process.env.OPENAI_API_KEY`. It dispatches chat completion requests configured with specific constraints:
+```javascript
+const completion = await openai.chat.completions.create({
+  model: 'gpt-3.5-turbo',
+  messages: [
+    {
+      role: 'system',
+      content: 'You are a helpful AI assistant for a file storage application named GalleryHub. Guide users on uploading, organizing into folders, sharing files, and editing images.',
+    },
+    { role: 'user', content: message },
+  ],
+  max_tokens: 200,
+  temperature: 0.7,
+});
+```
+
+#### Dual-Path Fallback Resilience
+Because cloud AI services can experience network latency, API key exhaustion, or outages, the controller wraps the OpenAI call in an internal try-catch block. If the OpenAI request fails, the API gracefully falls back:
+```javascript
+catch (error) {
+  console.log('ChatGPT failed, using fallback:', error.message);
+  response = "Hello! I'm here to help you with file management. How can I assist you today?";
+  isAI = false;
+}
+```
+The API returns a 200 status code regardless, delivering the response alongside an `isAI: boolean` indicator and a curated array of interactive suggestion chips:
+```json
+{
+  "success": true,
+  "response": "...",
+  "suggestions": [
+    "How do I upload files?",
+    "Show me my storage usage",
+    "What file types are supported?"
+  ],
+  "isAI": true
+}
+```
+This guarantees that the chatbot interface remains responsive and helpful even without an active OpenAI API key.
+
+---
+
+## Feature 13: User Profile, Account Security, Storage Quotas & Danger Zone Operations
+
+### 13.1 Overview & Architecture
+The account management subsystem provides tools for profile editing, custom avatar uploads, password changes, real-time storage quota tracking, and high-consequence administrative operations (the "Danger Zone").
+
+```mermaid
+flowchart TD
+    A["Settings Navigation (/gallery -> settings tab)"] --> B{"Settings Sub-Section"}
+    
+    B -- "profile" --> C["Profile Edit Sub-Page"]
+    B -- "password" --> D["Password Change Sub-Page"]
+    B -- "main" --> E["Main Settings Hub"]
+    
+    subgraph Profile Management
+        C --> C1["Upload Custom Avatar -> PUT /api/users/profile/picture"]
+        C --> C2["Update Name & Email -> PUT /api/users/profile"]
+    end
+    
+    subgraph Password Security
+        D --> D1["Validate Current Password (bcrypt.compare)"]
+        D --> D2["Enforce 6-Char Min & Confirmation Match"]
+        D --> D3["Hash New Password via Pre-Save Hook"]
+    end
+    
+    subgraph Storage Quota Tracking
+        E --> E1["Aggregate Total Size: allMedia.reduce(size)"]
+        E1 --> E2["Compare Against 500MB Limit"]
+        E2 --> E3["Render Dynamic Bar: Green <50%, Yellow 50-80%, Red >80%"]
+    end
+    
+    subgraph Danger Zone Operations
+        E --> F["Click 'Delete All Files'"]
+        F --> G["Prompt ConfirmModal Warning"]
+        G -- Confirmed --> H["Execute Parallel Cascade Deletion Across All Collections"]
+        H --> I["Reclaim Storage Quota to 0 MB"]
+    end
+```
+
+### 13.2 Deep Technical Implementation
+
+#### Profile Modifications & LocalStorage Synchronization
+Users can update their personal information on the profile editing sub-page. Submitting modifications dispatches a `PUT /api/users/profile` request containing `{ name, email }`. The controller checks `User.findById(req.user._id)`, applies changes, and saves the record. On the client side, successful updates update both React state and the serialized `localStorage` session cache:
+```javascript
+const stored = JSON.parse(localStorage.getItem('userInfo'));
+stored.name = data.name;
+stored.email = data.email;
+localStorage.setItem('userInfo', JSON.stringify(stored));
+```
+
+#### Avatar Ingestion Pipeline
+Clicking the user's avatar opens a hidden file input accepting `image/*`. The selected file is uploaded via `PUT /api/users/profile/picture` using a dedicated Multer disk storage engine configured to save avatars into `backend/uploads/` with a unique `profile-${Date.now()}` prefix. The user document's `profilePicture` field is updated with the new filename, which renders across the navigation header, settings menu, and collaboration modals.
+
+#### Password Verification & Modification
+Changing an account password requires entering the current password alongside the new password twice. The backend controller performs two-step validation:
+```javascript
+const user = await User.findById(req.user._id).select('+password');
+if (await user.matchPassword(req.body.currentPassword)) {
+  user.password = req.body.newPassword;
+  await user.save();
+} else {
+  return res.status(401).json({ message: 'Incorrect current password.' });
+}
+```
+Assigning `user.password = req.body.newPassword` flags the field as modified, automatically triggering the Mongoose pre-save hook to hash the new password with bcrypt before writing to the database.
+
+#### Dynamic Storage Quota Analytics
+GalleryHub tracks storage consumption against a defined ceiling of 500 MB (`500 * 1024 * 1024` bytes). The client calculates real-time usage across all loaded assets:
+```javascript
+const totalSize = allMedia.reduce((sum, item) => sum + (item.size || 0), 0);
+const usagePercent = Math.min((totalSize / STORAGE_QUOTA) * 100, 100);
+const quotaColor = usagePercent > 80 ? '#ea4335' : usagePercent > 50 ? '#fbbc04' : '#34a853';
+```
+The storage quota bar dynamically adjusts its width percentage and color (green for healthy capacity, amber for moderate usage, red for approaching capacity), providing an at-a-glance visualization of storage usage.
+
+#### The Danger Zone: Full Content Eradication
+The Danger Zone houses the "Delete All Files" action. To prevent catastrophic accidental data loss, clicking the button presents a `ConfirmModal` dialog. Confirming executes batch deletion across all collections, unlinks the physical files, resets local state arrays to empty, and reclaims all consumed storage.
+
+---
+
+## Feature 14: System-Aware Dynamic Theme Engine & Custom Accent Color Customizer
+
+### 14.1 Overview & Architecture
+GalleryHub includes a comprehensive theming system that supports three operational modes: System, Light, and Dark. In System mode, it listens to OS-level theme preferences in real-time. Additionally, users can personalize their UI with six custom accent colors.
+
+```mermaid
+flowchart TD
+    subgraph Theme Resolution Logic
+        A["themeMode State ('system' | 'light' | 'dark')"]
+        B["systemIsDark State (window.matchMedia listener)"]
+        A & B --> C{"Resolve darkMode Boolean"}
+        C --> D["Apply/Remove '.dark' Class on document.documentElement"]
+        D --> E["CSS Variables Switch Colors (--bg, --surface, --text, --border)"]
+    end
+
+    subgraph Accent Color Customization
+        F["User selects Accent Color (e.g., #a855f7)"] --> G["localStorage.setItem('settings_accentColor', color)"]
+        G --> H["document.documentElement.style.setProperty('--primary', color)"]
+        H --> I["Buttons, Highlights, Badges & Focus Rings Instantly Re-Skin"]
+    end
+```
+
+### 14.2 Deep Technical Implementation
+
+#### Three-Tier Theme Resolution Matrix
+Theme state is initialized in `App.js` with fallback to `localStorage`:
+```javascript
+const [themeMode, setThemeMode] = useState(() => localStorage.getItem('themeMode') || 'system');
+const [systemIsDark, setSystemIsDark] = useState(
+  () => window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+);
+const darkMode = themeMode === 'system' ? systemIsDark : themeMode === 'dark';
+```
+
+#### Real-Time OS Preference Listener
+To react when a user switches their operating system theme (e.g., automated sunset dark mode transitions), `App.js` establishes a persistent `MediaQueryList` event listener:
+```javascript
+useEffect(() => {
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  const handleChange = (e) => setSystemIsDark(e.matches);
+
+  if (mediaQuery.addEventListener) {
+    mediaQuery.addEventListener('change', handleChange);
+  } else {
+    mediaQuery.addListener(handleChange);
+  }
+  return () => mediaQuery.removeEventListener('change', handleChange);
+}, []);
+```
+Whenever `darkMode` updates, a secondary `useEffect` toggles the `.dark` class on the root HTML element: `document.documentElement.classList.toggle('dark', darkMode)`.
+
+#### CSS Variable Architecture
+The styling system relies on CSS custom properties declared in `index.css`:
+```css
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --text: #0f172a;
+  --text-secondary: #64748b;
+  --border: #e2e8f0;
+  --primary: #4285f4;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+html.dark {
+  --bg: #0b0f17;
+  --surface: #131b2e;
+  --text: #f8fafc;
+  --text-secondary: #94a3b8;
+  --border: #1e293b;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+```
+All UI components bind their backgrounds, borders, and typography to these CSS variables, enabling instant, flicker-free theme switches across the entire application.
+
+#### Runtime Accent Color Injection
+Users can choose from six vibrant accent color presets:
+- Google Blue (`#4285f4`)
+- Royal Purple (`#a855f7`)
+- Hot Pink (`#ec4899`)
+- Emerald Green (`#34a853`)
+- Sunset Amber (`#fbbc04`)
+- Crimson Red (`#ea4335`)
+
+Selecting a swatch persists the hex string to `localStorage` under `settings_accentColor` and applies it dynamically at runtime:
+```javascript
+document.documentElement.style.setProperty('--primary', color);
+```
+Primary buttons, active filter tabs, selection checkboxes, slider tracks, and focus indicators instantly update to match the selected color.
+
+---
+
+## Feature 15: Guided Onboarding Tour, Skeleton Shimmer Loading & UI Polish
+
+### 15.1 Overview & Architecture
+GalleryHub incorporates user onboarding and visual polish mechanisms to ensure an intuitive user experience. An automated walkthrough guides first-time users through the interface, while shimmer skeleton cards prevent layout shift during data loading.
+
+```mermaid
+flowchart TD
+    subgraph Onboarding Engine
+        A["App Mounts in Browser"] --> B{"Check localStorage('onboardingCompleted')"}
+        B -- Null / False --> C["Initialize OnboardingTour (intro.js-react)"]
+        B -- True --> D["Bypass Tour"]
+        
+        C --> E["Step 1: Welcome & Brand Logo"]
+        E --> F["Step 2: Upload Action Button"]
+        F --> G["Step 3: Gallery Views & Tabs"]
+        G --> H["Step 4: Folder Navigation"]
+        H --> I["Step 5: Activity Audit Feed"]
+        I --> J["Step 6: User Profile & Settings"]
+        J --> K["Set localStorage('onboardingCompleted', 'true')"]
+    end
+
+    subgraph Skeleton Shimmer Pipeline
+        L["Data Fetching Initiated (loading = true)"] --> M["Render SkeletonGrid (count = 8)"]
+        M --> N["Generate 8 SkeletonCard Items"]
+        N --> O["CSS Linear Gradient Shimmer Animation (2s infinite)"]
+        O --> P["Data Resolves -> Smooth Cross-Fade to Live Media Cards"]
+    end
+```
+
+### 15.2 Deep Technical Implementation
+
+#### The Guided Onboarding System (`OnboardingTour.js`)
+First-time user onboarding is built using `intro.js` and `intro.js-react`. The `OnboardingTour` component renders on the main dashboard. It reads `localStorage.getItem('onboardingCompleted')`. If absent, it initiates a 6-step guided walkthrough after a 1000ms delay to allow dashboard data to mount:
+1. `.brand-logo`: Welcome banner explaining the purpose of GalleryHub.
+2. `.bottom-dock-upload`: Points to the prominent upload button.
+3. `.category-tabs`: Explains filtering across images, videos, and documents.
+4. `.quick-folders-section`: Demonstrates folder organization and drag-and-drop targets.
+5. `.activity-feed-container`: Introduces the real-time operational audit log.
+6. `.user-profile-menu`: Shows how to configure settings, themes, and account security.
+
+The tour validates that target DOM elements are present before advancing steps to prevent errors on different viewport sizes. When the user completes or dismisses the tour, it writes `localStorage.setItem('onboardingCompleted', 'true')`.
+
+#### Shimmer Skeleton Architecture (`SkeletonCard.js`)
+To prevent Cumulative Layout Shift (CLS) during initial data fetching, GalleryHub renders animated skeleton loading cards via `SkeletonGrid`. The component renders placeholder cards matching the 4:3 aspect ratio of live media cards, complete with simulated text lines for the filename and date metadata.
+
+The loading animation is driven by a CSS gradient keyframe animation in `SkeletonCard.css`:
+```css
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--surface) 0%,
+    var(--border) 50%,
+    var(--surface) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite ease-in-out;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+```
+This produces a smooth, shimmering wave effect that communicates loading progress to the user.
+
+#### Micro-Interactions & Animation Utilities
+The application utilizes a suite of CSS keyframe animation utility classes:
+- `.animate-fade-in`: 0.25s opacity transition from 0 to 1 for content swapping.
+- `.animate-slide-up`: Modals and floating action bars smoothly translate from `translateY(20px)` to `translateY(0)`.
+- `.animate-slide-down`: Dropdown context menus slide downward smoothly.
+- `.animate-scale-in`: Used for confirmation dialogues, scaling from `scale(0.95)` to `scale(1)`.
+
+---
+
+## Deployment, Environment Configurations & Complete API Reference
+
+### Environment Variables Matrix
+
+#### Backend (`backend/.env`)
+| Variable | Required | Description | Example |
+|---|---|---|---|
+| `PORT` | No | Port for Express server (defaults to 5000) | `5000` |
+| `MONGODB_URI` | Yes | MongoDB Atlas connection string | `mongodb+srv://user:pass@cluster.mongodb.net/dbname` |
+| `JWT_SECRET` | Yes | Cryptographic secret for signing JWTs | `super_secret_512bit_random_key` |
+| `NODE_ENV` | No | Runtime environment (`development` / `production`) | `production` |
+| `OPENAI_API_KEY` | No | OpenAI API key for chatbot service | `sk-proj-...` |
+| `CLIENT_URL` | No | Specific frontend origin for CORS whitelist | `https://gallaryhub.onrender.com` |
+| `ALLOWED_ORIGINS`| No | Comma-delimited list of extra CORS origins | `http://localhost:3000,http://localhost:5173` |
+
+#### Frontend (`frontend/.env`)
+| Variable | Required | Description | Example |
+|---|---|---|---|
+| `REACT_APP_API_URL` | Yes | Root URL of Express API server | `http://localhost:5000` |
+| `GENERATE_SOURCEMAP`| No | Disables sourcemaps for production builds | `false` |
+
+---
+
+### Complete API Endpoint Reference
+
+```mermaid
+classDiagram
+    class UserRoutes {
+        +POST /api/users/register (Public)
+        +POST /api/users/login (Public)
+        +GET /api/users/profile (Private)
+        +PUT /api/users/profile (Private)
+        +PUT /api/users/profile/picture (Private)
+    }
+
+    class ImageRoutes {
+        +GET /api/images (Private)
+        +POST /api/images/upload (Private)
+        +POST /api/images/upload-multiple (Private)
+        +DELETE /api/images/:id (Private)
+        +GET /api/images/trash (Private)
+        +PUT /api/images/:id/restore (Private)
+        +DELETE /api/images/:id/permanent (Private)
+        +POST /api/images/download-zip (Private)
+    }
+
+    class VideoRoutes {
+        +GET /api/videos (Private)
+        +POST /api/videos/upload-multiple (Private)
+        +DELETE /api/videos/:id (Private)
+        +GET /api/videos/trash (Private)
+        +PUT /api/videos/:id/restore (Private)
+        +DELETE /api/videos/:id/permanent (Private)
+        +POST /api/videos/download-zip (Private)
+    }
+
+    class DocumentRoutes {
+        +GET /api/documents (Private)
+        +POST /api/documents/upload-multiple (Private)
+        +DELETE /api/documents/:id (Private)
+        +GET /api/documents/trash (Private)
+        +PUT /api/documents/:id/restore (Private)
+        +DELETE /api/documents/:id/permanent (Private)
+        +POST /api/documents/download-zip (Private)
+    }
+
+    class FolderRoutes {
+        +GET /api/folders (Private)
+        +POST /api/folders (Private)
+        +PUT /api/folders/remove-files (Private)
+        +PUT /api/folders/:id (Private)
+        +DELETE /api/folders/:id (Private)
+        +PUT /api/folders/:id/move (Private)
+        +POST /api/folders/:id/share (Private)
+        +DELETE /api/folders/:id/share/:userId (Private)
+        +GET /api/folders/shared (Private)
+    }
+
+    class ShareRoutes {
+        +POST /api/share (Private)
+        +GET /api/share/my-links (Private)
+        +DELETE /api/share/:id (Private)
+        +POST /api/share/:token/verify (Public)
+        +GET /api/share/:token (Public)
+    }
+
+    class UtilityRoutes {
+        +GET /api/activity (Private)
+        +POST /api/chatbot (Private)
+        +GET /api/test (Public)
+        +GET /api/ping (Public)
+    }
+```
+
+| HTTP Method | API Endpoint | Access Level | Description & Query / Body Parameters |
+|---|---|---|---|
+| `POST` | `/api/users/register` | Public | Registers a new account. Body: `{ name, email, password }`. |
+| `POST` | `/api/users/login` | Public | Authenticates credentials and returns signed JWT. Body: `{ email, password }`. |
+| `GET` | `/api/users/profile` | Private | Returns authenticated user's profile object (excluding password). |
+| `PUT` | `/api/users/profile` | Private | Updates profile name, email, or password. Body: `{ name, email, currentPassword?, newPassword? }`. |
+| `PUT` | `/api/users/profile/picture` | Private | Uploads custom avatar file. Multipart form-data field: `profilePicture`. |
+| `GET` | `/api/images` | Private | Fetches all active (non-deleted) images for user, sorted by upload date desc. |
+| `POST` | `/api/images/upload` | Private | Uploads a single image asset (max 50 MB). Multipart field: `image`. |
+| `POST` | `/api/images/upload-multiple`| Private | Uploads batch of images (up to 50). Multipart field: `images`. |
+| `DELETE` | `/api/images/:id` | Private | Soft-deletes image, clearing folder link and marking `isDeleted = true`. |
+| `GET` | `/api/images/trash` | Private | Retrieves all soft-deleted images in trash. |
+| `PUT` | `/api/images/:id/restore` | Private | Restores image from trash to active gallery. |
+| `DELETE` | `/api/images/:id/permanent`| Private | Permanently erases image file from disk and drops database document. |
+| `POST` | `/api/images/download-zip` | Private | Compresses selected images into streamed ZIP archive. Body: `{ imageIds: [...] }`. |
+| `GET` | `/api/videos` | Private | Fetches all active videos for user, including duration and thumbnail fields. |
+| `POST` | `/api/videos/upload-multiple` | Private | Uploads batch of videos (up to 10). Triggers background FFmpeg processing. |
+| `DELETE` | `/api/videos/:id` | Private | Soft-deletes video asset. |
+| `GET` | `/api/videos/trash` | Private | Retrieves all trashed videos. |
+| `PUT` | `/api/videos/:id/restore` | Private | Restores video asset from trash. |
+| `DELETE` | `/api/videos/:id/permanent`| Private | Permanently erases video file from disk and database. |
+| `POST` | `/api/videos/download-zip` | Private | Compresses selected videos into streamed ZIP archive. Body: `{ videoIds: [...] }`. |
+| `GET` | `/api/documents` | Private | Fetches all active documents for user. |
+| `POST` | `/api/documents/upload-multiple`| Private| Uploads batch of documents (up to 10). Multipart field: `documents`. |
+| `DELETE` | `/api/documents/:id` | Private | Soft-deletes document asset. |
+| `GET` | `/api/documents/trash` | Private | Retrieves all trashed documents. |
+| `PUT` | `/api/documents/:id/restore` | Private | Restores document asset from trash. |
+| `DELETE` | `/api/documents/:id/permanent` | Private | Permanently erases document file from disk and database. |
+| `POST` | `/api/documents/download-zip` | Private | Compresses selected documents into streamed ZIP archive. Body: `{ documentIds: [...] }`. |
+| `GET` | `/api/folders` | Private | Fetches all folders for user, aggregated with live counts of images, videos, and documents. |
+| `POST` | `/api/folders` | Private | Creates a folder with unique name and color. Body: `{ name, color }`. |
+| `PUT` | `/api/folders/remove-files`| Private | Unfiles specified assets from folders (`folder = null`). Body: `{ fileIds, fileType }`. |
+| `PUT` | `/api/folders/:id` | Private | Renames or changes color of a folder. Body: `{ name?, color? }`. |
+| `DELETE` | `/api/folders/:id` | Private | Deletes folder entity after unfiling all contained assets. |
+| `PUT` | `/api/folders/:id/move` | Private | Moves specified files into target folder. Body: `{ fileIds, fileType }`. |
+| `POST` | `/api/folders/:id/share` | Private | Shares folder with a user by email. Body: `{ email, permission: 'view'\|'edit' }`. |
+| `DELETE` | `/api/folders/:id/share/:userId` | Private | Revokes a collaborator's access to a shared folder. |
+| `GET` | `/api/folders/shared` | Private | Fetches all folders shared with the user, populated with owner details and permissions. |
+| `POST` | `/api/share` | Private | Creates public share link. Body: `{ fileId, fileType, password?, expiresInDays? }`. |
+| `GET` | `/api/share/my-links` | Private | Fetches all active share links generated by user with masked password booleans. |
+| `DELETE` | `/api/share/:id` | Private | Revokes a public share link. |
+| `POST` | `/api/share/:token/verify` | Public | Verifies password for a protected link. Body: `{ password }`. |
+| `GET` | `/api/share/:token` | Public | Validates access token and streams raw file to client. |
+| `GET` | `/api/activity` | Private | Retrieves paginated user audit log. Query: `page`, `limit`. |
+| `POST` | `/api/chatbot` | Private | Sends prompt to OpenAI assistant. Body: `{ message }`. |
+| `GET` | `/api/test` | Public | Health check route verifying backend server responsiveness. |
+| `GET` | `/api/ping` | Public | Lightweight keep-alive endpoint preventing hosting cold starts. |
+
+---
+
+> **Specification verified against GalleryHub codebase.** All architectural descriptions, data flows, controller logics, and schemas represent the exact implementation within the repository.

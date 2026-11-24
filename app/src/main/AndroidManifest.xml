@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+
+    <application
+        android:name=".GalleryHubApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
+        android:theme="@style/Theme.MyApplication">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:label="@string/app_name"
+            android:supportsPictureInPicture="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.MyApplication">
+
+            <!-- Verified Android App Links for GalleryHub HTTPS Share URLs (Short Masked & Direct) -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:scheme="http" />
+                <data android:host="galleryhub-n66c.onrender.com" />
+                <data android:pathPrefix="/api/share/" />
+                <data android:pathPrefix="/share/" />
+                <data android:pathPrefix="/s/" />
+            </intent-filter>
+
+            <!-- Compact Custom App Scheme for Instant Direct App Launch & QR Codes -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="galleryhub" android:host="s" />
+                <data android:scheme="galleryhub" android:host="share" />
+            </intent-filter>
+
+            <!-- Receive Single or Multiple Files Shared from Other Android Apps -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="video/*" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="video/*" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+
+        <!-- Dynamic Launcher Icons (6 Accent Presets × Dark / Light Surfaces + Android 13+ Monochrome) -->
+        <!-- Default Active Launcher Alias: Terracotta Studio · Dark -->
+        <activity-alias
+            android:name="com.example.LauncherTerracottaDark"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@drawable/ic_app_terracotta_dark"
+            android:label="@string/app_name"
+            android:roundIcon="@drawable/ic_app_terracotta_dark"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="com.example.LauncherTerracottaLight"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_app_terracotta_light"
+            android:label="@string/app_name"
+            android:roundIcon="@drawable/ic_app_terracotta_light"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="com.example.LauncherChampagneDark"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_app_champagne_dark"
+            android:label="@string/app_name"
+            android:roundIcon="@drawable/ic_app_champagne_dark"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="com.example.LauncherChampagneLight"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_app_champagne_light"
+            android:label="@string/app_name"
+            android:roundIcon="@drawable/ic_app_champagne_light"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="com.example.LauncherSageDark"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_app_sage_dark"
+            android:label="@string/app_name"
+            android:roundIcon="@drawable/ic_app_sage_dark"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="com.example.LauncherSageLight"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_app_sage_light"
+            android:label="@string/app_name"
+            android:roundIcon="@drawable/ic_app_sage_light"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="com.example.LauncherRoseDark"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_app_rose_dark"
+            android:label="@string/app_name"
+            android:roundIcon="@drawable/ic_app_rose_dark"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="com.example.LauncherRoseLight"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_app_rose_light"
+            android:label="@string/app_name"
+            android:roundIcon="@drawable/ic_app_rose_light"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="com.example.LauncherVioletDark"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_app_violet_dark"
+            android:label="@string/app_name"
+            android:roundIcon="@drawable/ic_app_violet_dark"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="com.example.LauncherVioletLight"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_app_violet_light"
+            android:label="@string/app_name"
+            android:roundIcon="@drawable/ic_app_violet_light"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="com.example.LauncherCobaltDark"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_app_cobalt_dark"
+            android:label="@string/app_name"
+            android:roundIcon="@drawable/ic_app_cobalt_dark"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="com.example.LauncherCobaltLight"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_app_cobalt_light"
+            android:label="@string/app_name"
+            android:roundIcon="@drawable/ic_app_cobalt_light"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Themed GalleryHub Home Screen Dashboard Widget -->
+        <receiver
+            android:name=".widget.GalleryHubDashboardWidget"
+            android:exported="true"
+            android:label="GalleryHub Dashboard">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/galleryhub_widget_info" />
+        </receiver>
+    </application>
+
+</manifest>

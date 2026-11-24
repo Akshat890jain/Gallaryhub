@@ -1,0 +1,133 @@
+{
+  "entities": {
+    "MediaOverride": {
+      "title": "MediaOverride",
+      "description": "Cloud-synced companion metadata for a GalleryHub media item (favorites, custom tags, renamed title, Private Vault hidden flag, and extracted OCR text).",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated Firebase UID owning this metadata record."
+        },
+        "mediaId": {
+          "type": "string",
+          "description": "Corresponding media item ID from the Render/MongoDB backend."
+        },
+        "favorite": {
+          "type": "boolean",
+          "description": "Whether the user favorited this media item."
+        },
+        "customTags": {
+          "type": "array",
+          "description": "User-defined #tags attached to this media item (max 30)."
+        },
+        "renamedTitle": {
+          "type": "string",
+          "description": "Optional user-edited display title for this media item."
+        },
+        "hiddenInVault": {
+          "type": "boolean",
+          "description": "Whether this item is hidden inside the Biometric Private Vault."
+        },
+        "ocrText": {
+          "type": "string",
+          "description": "Optional on-device ML Kit OCR extracted text for cross-device search."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp written via FieldValue.serverTimestamp() on creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp written via FieldValue.serverTimestamp() on every update."
+        }
+      },
+      "required": [
+        "userId",
+        "mediaId",
+        "favorite",
+        "customTags",
+        "hiddenInVault",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StudioState": {
+      "title": "StudioState",
+      "description": "Cloud-synced studio preferences, Private Vault PIN hash, and permanently dismissed activity IDs.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated Firebase UID owning this studio state document."
+        },
+        "vaultPinHash": {
+          "type": "string",
+          "description": "Optional salted SHA-256 hash of the user's 4-digit Private Vault PIN."
+        },
+        "vaultBiometricEnabled": {
+          "type": "boolean",
+          "description": "Whether biometric unlock is enabled for Private Vault."
+        },
+        "clearedActivityIds": {
+          "type": "array",
+          "description": "Activity item IDs cleared by the user so they stay hidden after server refreshes (max 200)."
+        },
+        "themeMode": {
+          "type": "string",
+          "enum": ["system", "light", "dark"],
+          "description": "Preferred Light/Dark/System theme mode."
+        },
+        "accentHex": {
+          "type": "string",
+          "description": "Hex color of the chosen Studio accent preset."
+        },
+        "exifScrubDefaultOn": {
+          "type": "boolean",
+          "description": "Default toggle for EXIF metadata scrubbing on external share."
+        },
+        "wifiOnlyUploads": {
+          "type": "boolean",
+          "description": "Whether background uploads wait for Wi-Fi connectivity."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp written via FieldValue.serverTimestamp() on creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp written via FieldValue.serverTimestamp() on every update."
+        }
+      },
+      "required": [
+        "userId",
+        "vaultBiometricEnabled",
+        "clearedActivityIds",
+        "themeMode",
+        "accentHex",
+        "exifScrubDefaultOn",
+        "wifiOnlyUploads",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/mediaOverrides/{mediaId}": {
+      "schema": {
+        "$ref": "#/entities/MediaOverride"
+      },
+      "description": "Per-user cloud-synced overrides (favorites, tags, renames, hidden vault status, OCR text) keyed by media ID."
+    },
+    "/users/{userId}/studioState/{docId}": {
+      "schema": {
+        "$ref": "#/entities/StudioState"
+      },
+      "description": "Per-user cloud-synced studio settings, Private Vault salted PIN hash, and cleared activity IDs."
+    }
+  }
+}
